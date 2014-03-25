@@ -1,0 +1,36 @@
+(require 'owdriver)
+(require 'ert-expectations)
+
+(expectations
+  (desc "define-command not add keymap")
+  (expect nil
+    (let ((called-add-keymap))
+      (stub owdriver-add-keymap => (setq called-add-keymap t))
+      (owdriver-define-command scroll-up nil)
+      called-add-keymap))
+  (desc "define-command define command")
+  (expect t
+    (commandp 'owdriver-do-scroll-up))
+  (desc "define-command check function")
+  (expect (mock (scroll-up *))
+    (owdriver-do-scroll-up))
+  (desc "define-command add keymap")
+  (expect t
+    (let ((called-add-keymap))
+      (stub owdriver-add-keymap => (setq called-add-keymap t))
+      (owdriver-define-command scroll-up t)
+      called-add-keymap))
+  (desc "define-command add keymap with arg")
+  (expect (mock (owdriver-add-keymap (key-description (nth 0 (where-is-internal 'scroll-up global-map)))
+                                     'owdriver-do-scroll-up))
+    (owdriver-define-command scroll-up t))
+  (desc "define-command have body")
+  (expect '(forward-char)
+    (let ((called))
+      (stub scroll-up => (push 'scroll-up called))
+      (stub forward-char => (push 'forward-char called))
+      (owdriver-define-command scroll-up t (forward-char))
+      (owdriver-do-scroll-up)
+      called))
+  )
+
