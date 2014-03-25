@@ -1,4 +1,4 @@
-![<https://travis-ci.org/aki2o/owdriver.svg?branch=master>](https://travis-ci.org/aki2o/owdriver)
+[![Build Status](https://travis-ci.org/aki2o/owdriver.svg?branch=master)](https://travis-ci.org/aki2o/owdriver)
 
 ![Japanese](https://github.com/aki2o/owdriver/blob/master/README-ja.md)
 
