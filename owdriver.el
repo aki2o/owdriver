@@ -54,6 +54,10 @@
 ;;; Customization:
 ;; 
 ;; [EVAL] (autodoc-document-lisp-buffer :type 'user-variable :prefix "owdriver-[^-]" :docstring t)
+;; `owdriver-prefix-key'
+;; String of the prefix keystroke for `owdriver-mode-map'.
+;; `owdriver-next-window-prefer-pophint'
+;; Whether to prefer to use `pophint:do' for `owdriver-next-window'.
 ;; 
 ;;  *** END auto-documentation
 
@@ -112,6 +116,11 @@
   :type 'string
   :group 'owdriver)
 
+(defcustom owdriver-next-window-prefer-pophint t
+  "Whether to prefer to use `pophint:do' for `owdriver-next-window'."
+  :type 'boolean
+  :group 'owdriver)
+
 
 (log4e:deflogger "owdriver" "%t [%l] %m" "%H:%M:%S" '((fatal . "fatal")
                                                       (error . "error")
@@ -138,15 +147,17 @@
   (declare (indent 1))
   `(let ((it ,test)) (when it ,@body)))
 
-(defmacro owdriver--with-selected-window (tasknm &rest body)
-  (declare (indent 1))
+(defmacro owdriver--with-selected-window (tasknm force-next-window &rest body)
+  (declare (indent 2))
   `(yaxception:$
      (yaxception:try
-       (when (or (not (window-live-p owdriver--window))
+       (owdriver--trace "start with select window : wnd[%s] force-next-window[%s]"
+                        owdriver--window ,force-next-window)
+       (when (or ,force-next-window
+                 (not (window-live-p owdriver--window))
                  (eq owdriver--window (nth 0 (get-buffer-window-list))))
          (let ((owdriver--move-window-amount 1))
            (owdriver-next-window)))
-       (owdriver--trace "start with select window : %s" owdriver--window)
        (with-selected-window owdriver--window
          ,@body))
      (yaxception:catch 'error e
@@ -205,20 +216,41 @@
              (move-amount (or owdriver--move-window-amount
                               (when (window-live-p owdriver--window) 1)
                               2))
-             nextwnd)
+             (is-nextable-window (lambda (w)
+                                   (and (window-live-p w)
+                                        (not (eq w actwnd))
+                                        (not (eq w currwnd))
+                                        (not (minibufferp (window-buffer w))))))
+             nextwnd popwnd)
         (select-window currwnd)
         (owdriver--trace "start %s window. currwnd[%s] move-amount[%s]"
                          (if reverse "previous" "next") (selected-window) move-amount)
         ;; Move to next target window
-        (while (and (> move-amount 0)
-                    (not (eq nextwnd currwnd)))
-          (other-window (if reverse -1 1))
-          (setq nextwnd (get-buffer-window))
-          (owdriver--trace "selected next window : %s" nextwnd)
-          (when (and (not (eq nextwnd actwnd))
-                     (not (minibufferp (current-buffer))))
-            (decf move-amount)
-            (owdriver--trace "decremented move-amount[%s]" move-amount)))
+        (if (and (and owdriver-next-window-prefer-pophint
+                      (featurep 'pophint)
+                      (>= (loop for w in (window-list) count (funcall is-nextable-window w)) 2)))
+            (pophint:do :not-highlight t
+                        :allwindow t
+                        :source '((shown . "Wnd")
+                                  (requires . 0)
+                                  (method . (lambda ()
+                                              (when (and (funcall is-nextable-window (selected-window))
+                                                         (not (eq popwnd (selected-window))))
+                                                (owdriver--trace "found nextable window : %s" (selected-window))
+                                                (setq popwnd (selected-window))
+                                                (make-pophint:hint :startpt (point-min) :endpt (point) :value ""))))
+                                  (action . (lambda (hint)
+                                              (funcall pophint--default-action hint)
+                                              (goto-char (pophint:hint-endpt hint))
+                                              (setq nextwnd (get-buffer-window))))))
+          (while (and (> move-amount 0)
+                      (not (eq nextwnd currwnd)))
+            (other-window (if reverse -1 1))
+            (setq nextwnd (get-buffer-window))
+            (owdriver--trace "selected next window : %s" nextwnd)
+            (when (funcall is-nextable-window nextwnd)
+              (decf move-amount)
+              (owdriver--trace "decremented move-amount[%s]" move-amount))))
         ;; Blink target window after move
         (when (not (eq nextwnd currwnd))
           (owdriver--trace "start blink window : %s" nextwnd)
@@ -279,15 +311,18 @@ The command named `owdriver-do-COMMAND' is defined by this function.
 ADD-KEYMAP is boolean. If non-nil, do `owdriver-add-keymap' using the key bound to COMMAND in `global-map'.
 BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is no need."
   (declare (indent 2))
-  (let ((body (or body `((,command))))
-        (ncommand (intern (concat "owdriver-do-" (symbol-name command)))))
+  (let* ((body (or body `((,command))))
+         (cmdnm (symbol-name command))
+         (ncommand (intern (concat "owdriver-do-" cmdnm)))
+         (tasknm (replace-regexp-in-string "-" " " cmdnm)))
     `(progn
-       (owdriver--trace "start define command[%s]. add-keymap[%s]" ,(symbol-name command) ,add-keymap)
-       (defun ,ncommand ()
-         ,(format "Do `%s' in `owdriver--window'." (symbol-name command))
-         (interactive)
-         (owdriver--with-selected-window ,(replace-regexp-in-string "-" " " (symbol-name command))
-           ,@body))
+       (owdriver--trace "start define command[%s]. add-keymap[%s]" ,cmdnm ,add-keymap)
+       (defun ,ncommand (&optional arg)
+         ,(format "Do `%s' in `owdriver--window'.\n\nIf prefix argument is given, do `owdriver-next-window' before that." cmdnm)
+         (interactive "p")
+         (let ((force-next-window (> arg 1)))
+           (owdriver--with-selected-window ,tasknm force-next-window
+             ,@body)))
        (when ,add-keymap
          (owdriver-add-keymap (owdriver--get-keybind ',command) ',ncommand)))))
 

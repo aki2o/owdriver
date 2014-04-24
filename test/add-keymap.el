@@ -1,5 +1,5 @@
 (require 'owdriver)
-(require 'ert-expectations)
+(require 'el-expectations)
 
 (expectations
   (desc "add-keymap do nothing from not string")

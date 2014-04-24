@@ -1,5 +1,5 @@
 (require 'owdriver)
-(require 'ert-expectations)
+(require 'el-expectations)
 
 (expectations
   (desc "define-command not add keymap")
