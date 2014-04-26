@@ -335,7 +335,9 @@ BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is n
   (owdriver-add-keymap "C-q"        'owdriver-quit)
   ;; Basic command
   (owdriver-define-command scroll-up               t)
+  (owdriver-define-command scroll-up-command       t)
   (owdriver-define-command scroll-down             t)
+  (owdriver-define-command scroll-down-command     t)
   (owdriver-define-command scroll-left             t (scroll-left 10 t))
   (owdriver-define-command scroll-right            t (scroll-right 10 t))
   (owdriver-define-command next-line               t (line-move 1))
