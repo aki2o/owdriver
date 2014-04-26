@@ -5,7 +5,7 @@
 * What's this?
   
   This is a extension of Emacs that provides the function for doing various action to
-  other windows quickly in multi window situation.  
+  other windows without =other-window= in multi window situation.  
   In default, that's move, scroll and isearch.  
   Moreover, you can add the action what you want.  
 
@@ -126,21 +126,29 @@
 
 * Usage
 
+*** Start to control other window
+
+    Push =owdriver-prefix-key=.  
+    Then, you can control target window by the same way as active window.  
+    Or, you can control directly by pushing the key bound to =owdriver-do-...=.  
+
 *** Change target window
 
-    You can change target window by the following method.  
+    You can change target window by the following way.  
     
     - push the key bound to =owdriver-next-window= / =owdriver-previous-window= after =owdriver-prefix-key=
     - give prefix argument to the command named =owdriver-do-...= without =owdriver-prefix-key=
 
-*** Turn back to active window
+    If [[https://github.com/aki2o/emacs-pophint][pophint.el]] is installed, show hint to select target window.  
 
-    You turn back to active window by the following action.
+*** Finish and turn back to active window
+
+    You turn back to active window by the following way.  
 
     - push the key not bound to the keymap after =owdriver-prefix-key=
     - push the key bound to =owdriver-quit= / =keyboard-quit=
 
-*** Focus on target window
+*** Finish and focus on target window
 
     If you want to change active window to target window, push the key bound to =owdriver-focus-window=.  
     
