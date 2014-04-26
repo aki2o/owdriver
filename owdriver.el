@@ -1,4 +1,4 @@
-;;; owdriver.el --- Do various action to other windows quickly
+;;; owdriver.el --- Quickly perform various actions on other windows
 
 ;; Copyright (C) 2014  Hiroaki Otsu
 
