@@ -15,11 +15,11 @@ Moreover, you can add the action what you want.
 
 ### If use package.el
 
-2014/04/26 Now application
+2014/04/27 It's available by using melpa.
 
 ### If use el-get.el
 
-2014/04/26 Now application
+2014/04/27 It's available. But, master branch only.
 
 ### If use auto-install.el
 
