@@ -77,7 +77,7 @@ Then, the command named `owdriver-do-...` is defined.
 ### Add key binding after prefix key
 
 The same key is bound as global map by `owdriver-define-command`.  
-If you add/change the key binding, use `owdriver-add-keymap`.  
+If you add/change the key binding, use `owdriver-add-keymap` before activate `owdriver-mode`.  
 
 ### Default configuration
 
@@ -90,7 +90,9 @@ Here is the default configuration by `owdriver-config-default`.
 (owdriver-add-keymap "C-q"        'owdriver-quit)
 
 (owdriver-define-command scroll-up               t)
+(owdriver-define-command scroll-up-command       t)
 (owdriver-define-command scroll-down             t)
+(owdriver-define-command scroll-down-command     t)
 (owdriver-define-command scroll-left             t (scroll-left 10 t))
 (owdriver-define-command scroll-right            t (scroll-right 10 t))
 (owdriver-define-command next-line               t (line-move 1))
