@@ -107,7 +107,7 @@
 (require 'pophint nil t)
 
 (defgroup owdriver nil
-  "Do various action to other windows quickly."
+  "Quickly perform various actions on other windows."
   :group 'convenience
   :prefix "owdriver-")
 
@@ -195,7 +195,7 @@
 (defvar owdriver-mode-map (make-sparse-keymap))
 
 (define-minor-mode owdriver-mode
-  "Do various action to other windows quickly"
+  "Quickly perform various actions on other windows."
   :init-value nil
   :keymap owdriver-mode-map
   :global t
