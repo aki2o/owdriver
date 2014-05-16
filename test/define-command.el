@@ -12,7 +12,7 @@
   (expect t
     (commandp 'owdriver-do-scroll-up))
   (desc "define-command check function")
-  (expect (mock (call-interactively scroll-up))
+  (expect (mock (call-interactively 'scroll-up))
     (owdriver-do-scroll-up))
   (desc "define-command add keymap")
   (expect t
