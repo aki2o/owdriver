@@ -12,7 +12,7 @@
   (expect t
     (commandp 'owdriver-do-scroll-up))
   (desc "define-command check function")
-  (expect (mock (scroll-up *))
+  (expect (mock (call-interactively scroll-up))
     (owdriver-do-scroll-up))
   (desc "define-command add keymap")
   (expect t
@@ -21,9 +21,9 @@
       (owdriver-define-command scroll-up t)
       called-add-keymap))
   (desc "define-command add keymap with arg")
-  (expect (mock (owdriver-add-keymap (key-description (nth 0 (where-is-internal 'forward-char global-map)))
-                                     'owdriver-do-forward-char))
-    (owdriver-define-command forward-char t))
+  (expect (mock (owdriver-add-keymap (key-description (nth 0 (where-is-internal 'beginning-of-buffer global-map)))
+                                     'owdriver-do-beginning-of-buffer))
+    (owdriver-define-command beginning-of-buffer t))
   (desc "define-command have body")
   (expect '(forward-char)
     (let ((called))
