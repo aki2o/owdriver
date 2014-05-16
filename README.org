@@ -92,30 +92,33 @@
     Here is the default configuration by =owdriver-config-default=.  
 
     #+BEGIN_SRC lisp
+  ;; Own command
   (owdriver-add-keymap "C-o"        'owdriver-next-window)
   (owdriver-add-keymap "C-S-o"      'owdriver-previous-window)
   (owdriver-add-keymap "<C-return>" 'owdriver-focus-window)
   (owdriver-add-keymap "C-q"        'owdriver-quit)
-
+  ;; Basic command
   (owdriver-define-command scroll-up               t)
   (owdriver-define-command scroll-up-command       t)
   (owdriver-define-command scroll-down             t)
   (owdriver-define-command scroll-down-command     t)
   (owdriver-define-command scroll-left             t (scroll-left 10 t))
   (owdriver-define-command scroll-right            t (scroll-right 10 t))
-  (owdriver-define-command next-line               t (line-move 1))
-  (owdriver-define-command previous-line           t (line-move -1))
+  (owdriver-define-command next-line               t)
+  (owdriver-define-command previous-line           t)
   (owdriver-define-command forward-char            t)
   (owdriver-define-command forward-word            t)
-  (owdriver-define-command backward-char           t (forward-char -1))
-  (owdriver-define-command backward-word           t (forward-word -1))
-  (owdriver-define-command move-beginning-of-line  t (goto-char (point-at-bol)))
-  (owdriver-define-command beginning-of-buffer     t (goto-char (point-min)))
-  (owdriver-define-command move-end-of-line        t (goto-char (point-at-eol)))
-  (owdriver-define-command end-of-buffer           t (goto-char (point-max)))
-  (owdriver-define-command isearch-forward         t)
-  (owdriver-define-command isearch-backward        t)
-
+  (owdriver-define-command backward-char           t)
+  (owdriver-define-command backward-word           t)
+  (owdriver-define-command move-beginning-of-line  t)
+  (owdriver-define-command move-end-of-line        t)
+  (owdriver-define-command beginning-of-buffer     t)
+  (owdriver-define-command end-of-buffer           t)
+  (owdriver-define-command isearch-forward         t (isearch-forward))
+  (owdriver-define-command isearch-backward        t (isearch-backward))
+  (owdriver-define-command set-mark-command        t)
+  (owdriver-define-command kill-ring-save          t (call-interactively 'kill-ring-save) (deactivate-mark))
+  ;; Third party command
   (owdriver-define-command pophint:do t (pophint:do :not-switch-window t))
   (owdriver-define-command inertias-up t)
   (owdriver-define-command inertias-down t)

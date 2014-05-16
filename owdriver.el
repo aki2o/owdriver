@@ -5,7 +5,7 @@
 ;; Author: Hiroaki Otsu <ootsuhiroaki@gmail.com>
 ;; Keywords: convenience
 ;; URL: https://github.com/aki2o/owdriver
-;; Version: 0.0.1
+;; Version: 0.0.2
 ;; Package-Requires: ((smartrep "0.0.3") (log4e "0.2.0") (yaxception "0.2.0"))
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -311,7 +311,7 @@ The command named `owdriver-do-COMMAND' is defined by this function.
 ADD-KEYMAP is boolean. If non-nil, do `owdriver-add-keymap' using the key bound to COMMAND in `global-map'.
 BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is no need."
   (declare (indent 2))
-  (let* ((body (or body `((,command))))
+  (let* ((body (or body `((call-interactively ',command))))
          (cmdnm (symbol-name command))
          (ncommand (intern (concat "owdriver-do-" cmdnm)))
          (tasknm (replace-regexp-in-string "-" " " cmdnm)))
@@ -324,7 +324,8 @@ BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is n
            (owdriver--with-selected-window ,tasknm force-next-window
              ,@body)))
        (when ,add-keymap
-         (owdriver-add-keymap (owdriver--get-keybind ',command) ',ncommand)))))
+         (dolist (k (owdriver--get-binding-keys ',command))
+           (owdriver-add-keymap k ',ncommand))))))
 
 (defun owdriver-config-default ()
   "Do the recommended configuration."
@@ -340,18 +341,20 @@ BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is n
   (owdriver-define-command scroll-down-command     t)
   (owdriver-define-command scroll-left             t (scroll-left 10 t))
   (owdriver-define-command scroll-right            t (scroll-right 10 t))
-  (owdriver-define-command next-line               t (line-move 1))
-  (owdriver-define-command previous-line           t (line-move -1))
+  (owdriver-define-command next-line               t)
+  (owdriver-define-command previous-line           t)
   (owdriver-define-command forward-char            t)
   (owdriver-define-command forward-word            t)
-  (owdriver-define-command backward-char           t (forward-char -1))
-  (owdriver-define-command backward-word           t (forward-word -1))
-  (owdriver-define-command move-beginning-of-line  t (goto-char (point-at-bol)))
-  (owdriver-define-command beginning-of-buffer     t (goto-char (point-min)))
-  (owdriver-define-command move-end-of-line        t (goto-char (point-at-eol)))
-  (owdriver-define-command end-of-buffer           t (goto-char (point-max)))
-  (owdriver-define-command isearch-forward         t)
-  (owdriver-define-command isearch-backward        t)
+  (owdriver-define-command backward-char           t)
+  (owdriver-define-command backward-word           t)
+  (owdriver-define-command move-beginning-of-line  t)
+  (owdriver-define-command move-end-of-line        t)
+  (owdriver-define-command beginning-of-buffer     t)
+  (owdriver-define-command end-of-buffer           t)
+  (owdriver-define-command isearch-forward         t (isearch-forward))
+  (owdriver-define-command isearch-backward        t (isearch-backward))
+  (owdriver-define-command set-mark-command        t)
+  (owdriver-define-command kill-ring-save          t (call-interactively 'kill-ring-save) (deactivate-mark))
   ;; Third party command
   (owdriver-define-command pophint:do t (pophint:do :not-switch-window t))
   (owdriver-define-command inertias-up t)
