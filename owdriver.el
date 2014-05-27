@@ -5,7 +5,7 @@
 ;; Author: Hiroaki Otsu <ootsuhiroaki@gmail.com>
 ;; Keywords: convenience
 ;; URL: https://github.com/aki2o/owdriver
-;; Version: 0.0.2
+;; Version: 0.0.3
 ;; Package-Requires: ((smartrep "0.0.3") (log4e "0.2.0") (yaxception "0.2.0"))
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -255,11 +255,16 @@
         (when (not (eq nextwnd currwnd))
           (owdriver--trace "start blink window : %s" nextwnd)
           (let ((ov (make-overlay (window-start) (window-end))))
-            (overlay-put ov 'face 'highlight)
-            (select-window actwnd)
-            (sit-for 0.1)
-            (select-window nextwnd)
-            (delete-overlay ov)))
+            (yaxception:$
+              (yaxception:try
+                (overlay-put ov 'face 'highlight)
+                (select-window actwnd)
+                (sit-for 0.1)
+                (select-window nextwnd))
+              (yaxception:catch 'error e
+                (yaxception:throw e))
+              (yaxception:finally
+                (delete-overlay ov)))))
         ;; Return to working window at last
         (select-window actwnd)
         (setq owdriver--window nextwnd)
