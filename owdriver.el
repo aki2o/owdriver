@@ -5,7 +5,7 @@
 ;; Author: Hiroaki Otsu <ootsuhiroaki@gmail.com>
 ;; Keywords: convenience
 ;; URL: https://github.com/aki2o/owdriver
-;; Version: 0.0.3
+;; Version: 0.0.4
 ;; Package-Requires: ((smartrep "0.0.3") (log4e "0.2.0") (yaxception "0.2.0"))
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -233,6 +233,7 @@
                         :allwindow t
                         :source '((shown . "Wnd")
                                   (requires . 0)
+                                  (tip-face-attr . (:height 2.0))
                                   (method . (lambda ()
                                               (when (and (funcall is-nextable-window (selected-window))
                                                          (not (eq popwnd (selected-window))))
