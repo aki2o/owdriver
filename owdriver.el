@@ -5,7 +5,7 @@
 ;; Author: Hiroaki Otsu <ootsuhiroaki@gmail.com>
 ;; Keywords: convenience
 ;; URL: https://github.com/aki2o/owdriver
-;; Version: 0.0.5
+;; Version: 0.0.6
 ;; Package-Requires: ((smartrep "0.0.3") (log4e "0.2.0") (yaxception "0.2.0"))
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -197,6 +197,7 @@
 (define-minor-mode owdriver-mode
   "Quickly perform various actions on other windows."
   :init-value nil
+  :lighter " OW"
   :keymap owdriver-mode-map
   :global t
   :group 'owdriver
@@ -239,7 +240,7 @@
                                                          (not (eq popwnd (selected-window))))
                                                 (owdriver--trace "found nextable window : %s" (selected-window))
                                                 (setq popwnd (selected-window))
-                                                (make-pophint:hint :startpt (point-min) :endpt (point) :value ""))))
+                                                (make-pophint:hint :startpt (window-start) :endpt (point) :value ""))))
                                   (action . (lambda (hint)
                                               (funcall pophint--default-action hint)
                                               (goto-char (pophint:hint-endpt hint))
