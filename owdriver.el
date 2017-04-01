@@ -5,7 +5,7 @@
 ;; Author: Hiroaki Otsu <ootsuhiroaki@gmail.com>
 ;; Keywords: convenience
 ;; URL: https://github.com/aki2o/owdriver
-;; Version: 0.0.6
+;; Version: 0.1.0
 ;; Package-Requires: ((smartrep "0.0.3") (log4e "0.2.0") (yaxception "0.2.0"))
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -192,8 +192,10 @@
 ;;;;;;;;;;
 ;; Mode
 
+;;;###autoload
 (defvar owdriver-mode-map (make-sparse-keymap))
 
+;;;###autoload
 (define-minor-mode owdriver-mode
   "Quickly perform various actions on other windows."
   :init-value nil
@@ -222,29 +224,16 @@
                                         (not (eq w actwnd))
                                         (not (eq w currwnd))
                                         (not (minibufferp (window-buffer w))))))
-             nextwnd popwnd)
+             nextwnd popwnd wndloc)
         (select-window currwnd)
         (owdriver--trace "start %s window. currwnd[%s] move-amount[%s]"
                          (if reverse "previous" "next") (selected-window) move-amount)
         ;; Move to next target window
         (if (and (and owdriver-next-window-prefer-pophint
                       (featurep 'pophint)
+                      (boundp 'pophint--next-window-source)
                       (>= (loop for w in (window-list) count (funcall is-nextable-window w)) 2)))
-            (pophint:do :not-highlight t
-                        :allwindow t
-                        :source '((shown . "Wnd")
-                                  (requires . 0)
-                                  (tip-face-attr . (:height 2.0))
-                                  (method . (lambda ()
-                                              (when (and (funcall is-nextable-window (selected-window))
-                                                         (not (eq popwnd (selected-window))))
-                                                (owdriver--trace "found nextable window : %s" (selected-window))
-                                                (setq popwnd (selected-window))
-                                                (make-pophint:hint :startpt (window-start) :endpt (point) :value ""))))
-                                  (action . (lambda (hint)
-                                              (funcall pophint--default-action hint)
-                                              (goto-char (pophint:hint-endpt hint))
-                                              (setq nextwnd (get-buffer-window))))))
+            (setq nextwnd (pophint:do :source pophint--next-window-source :allwindow t))
           (while (and (> move-amount 0)
                       (not (eq nextwnd currwnd)))
             (other-window (if reverse -1 1))
@@ -298,6 +287,7 @@
 ;;;;;;;;;;;;;;;
 ;; For Setup
 
+;;;###autoload
 (defun owdriver-add-keymap (keystroke command)
   "Add the keymap of `owdriver-mode-map'."
   (owdriver--trace "start add keymap. keystroke[%s] command[%s]" keystroke command)
@@ -311,6 +301,7 @@
       (setq owdriver--keymap-alist (delq it owdriver--keymap-alist)))
     (add-to-list 'owdriver--keymap-alist `(,keystroke . ,command))))
 
+;;;###autoload
 (defmacro owdriver-define-command (command add-keymap &rest body)
   "Define the command for driving `owdriver--window' from COMMAND.
 
@@ -324,6 +315,7 @@ BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is n
          (tasknm (replace-regexp-in-string "-" " " cmdnm)))
     `(progn
        (owdriver--trace "start define command[%s]. add-keymap[%s]" ,cmdnm ,add-keymap)
+       ;;;###autoload
        (defun ,ncommand (&optional arg)
          ,(format "Do `%s' in `owdriver--window'.\n\nIf prefix argument is given, do `owdriver-next-window' before that." cmdnm)
          (interactive "p")
@@ -334,6 +326,7 @@ BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is n
          (dolist (k (owdriver--get-binding-keys ',command))
            (owdriver-add-keymap k ',ncommand))))))
 
+;;;###autoload
 (defun owdriver-config-default ()
   "Do the recommended configuration."
   ;; Own command
