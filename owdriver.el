@@ -5,7 +5,7 @@
 ;; Author: Hiroaki Otsu <ootsuhiroaki@gmail.com>
 ;; Keywords: convenience
 ;; URL: https://github.com/aki2o/owdriver
-;; Version: 0.1.0
+;; Version: 0.1.1
 ;; Package-Requires: ((smartrep "0.0.3") (log4e "0.2.0") (yaxception "0.2.0"))
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -90,7 +90,7 @@
 
 ;;; Tested On:
 ;; 
-;; - Emacs ... GNU Emacs 24.2.1 (i386-mingw-nt5.1.2600) of 2012-12-08 on GNUPACK
+;; - Emacs ... GNU Emacs 26.1 (build 1, x86_64-apple-darwin14.5.0, NS appkit-1348.17 Version 10.10.5 (Build 14F2511)) of 2018-05-31
 ;; - smartrep.el ... Version 0.0.3
 ;; - yaxception.el ... Version 0.2.0
 ;; - log4e.el ... Version 0.2.0
@@ -361,7 +361,24 @@ BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is n
   (owdriver-define-command pophint:do t (pophint:do :not-switch-window t))
   (owdriver-define-command inertias-up t)
   (owdriver-define-command inertias-down t)
-  )
+
+  ;; Patch for Emacs 26.1
+  (when (>= emacs-major-version 26)
+    (defun owdriver--patch-on-26-1 ()
+      "Function to patch the trouble on GNU Emacs 26.1 (build 1, x86_64-apple-darwin14.5.0, NS appkit-1348.17 Version 10.10.5 (Build 14F2511)) of 2018-05-31,
+which emacs seems to not refresh a screen when `scroll-left', `scroll-right' with `with-selected-window'."
+      (let ((wnd (get-buffer-window))
+            (pt (with-selected-window owdriver--window (point))))
+        (select-window owdriver--window)
+        (forward-char)
+        (when (= (point) pt) (backward-char))
+        (select-window wnd)
+        (select-window owdriver--window)
+        (goto-char pt)
+        (select-window wnd)))
+
+    (defadvice owdriver-do-scroll-left (after owdriver-patch activate) (owdriver--patch-on-26-1))
+    (defadvice owdriver-do-scroll-right (after owdriver-patch activate) (owdriver--patch-on-26-1))))
 
 
 (provide 'owdriver)
