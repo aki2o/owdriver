@@ -5,7 +5,7 @@
 ;; Author: Hiroaki Otsu <ootsuhiroaki@gmail.com>
 ;; Keywords: convenience
 ;; URL: https://github.com/aki2o/owdriver
-;; Version: 0.1.1
+;; Version: 0.2.0
 ;; Package-Requires: ((smartrep "0.0.3") (log4e "0.2.0") (yaxception "0.2.0"))
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -312,6 +312,7 @@ BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is n
   (let* ((body (or body `((call-interactively ',command))))
          (cmdnm (symbol-name command))
          (ncommand (intern (concat "owdriver-do-" cmdnm)))
+         (fcommand (intern (concat "owdriver-do-" cmdnm "-on-next-window")))
          (tasknm (replace-regexp-in-string "-" " " cmdnm)))
     `(progn
        (owdriver--trace "start define command[%s]. add-keymap[%s]" ,cmdnm ,add-keymap)
@@ -322,6 +323,11 @@ BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is n
          (let ((force-next-window (and arg (> arg 1))))
            (owdriver--with-selected-window ,tasknm force-next-window
              ,@body)))
+       (defun ,fcommand ()
+         ,(format "Do `%s' in `owdriver--window' with `owdriver-next-window'." cmdnm)
+         (interactive)
+         (owdriver--with-selected-window ,tasknm t
+           ,@body))
        (when ,add-keymap
          (dolist (k (owdriver--get-binding-keys ',command))
            (owdriver-add-keymap k ',ncommand))))))
