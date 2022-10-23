@@ -209,10 +209,13 @@
 (defvar owdriver--marker nil)
 (defvar owdriver-keep-driving-commands '(owdriver-start owdriver-next-window owdriver-previous-window))
 (defvar owdriver-keep-driving-command-prefixes '("scroll-" "next-" "previous-" "forward-" "backward-" "beginning-of-" "end-of-" "move-" "switch-to-" "xref-" "find-" "isearch-" "project-" "projectile-"))
-(defvar owdriver-keep-driving-command-regexp (rx-to-string `(and bos (regexp ,(regexp-opt owdriver-keep-driving-command-prefixes)))))
+(defvar owdriver-keep-driving-command-regexp nil)
 (defvar owdriver-keep-driving-function 'owdriver--keep-driving-with-default)
 
 (defun owdriver--keep-driving-with-default (command)
+  (when (not owdriver-keep-driving-command-regexp)
+    (setq owdriver-keep-driving-command-regexp
+          (rx-to-string `(and bos (regexp ,(regexp-opt owdriver-keep-driving-command-prefixes))))))
   (or (memq command owdriver-keep-driving-commands)
       (string-match owdriver-keep-driving-command-regexp (symbol-name command))))
 
