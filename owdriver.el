@@ -6,7 +6,7 @@
 ;; Keywords: convenience
 ;; URL: https://github.com/aki2o/owdriver
 ;; Version: 0.2.0
-;; Package-Requires: ((smartrep "0.0.3") (log4e "0.2.0") (yaxception "0.2.0"))
+;; Package-Requires: ((log4e "0.2.0") (yaxception "0.2.0"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -30,7 +30,6 @@
 
 ;;; Dependency:
 ;; 
-;; - smartrep.el ( see <https://github.com/myuhe/smartrep.el> )
 ;; - yaxception.el ( see <https://github.com/aki2o/yaxception> )
 ;; - log4e.el ( see <https://github.com/aki2o/log4e> )
 
@@ -91,7 +90,6 @@
 ;;; Tested On:
 ;; 
 ;; - Emacs ... GNU Emacs 26.1 (build 1, x86_64-apple-darwin14.5.0, NS appkit-1348.17 Version 10.10.5 (Build 14F2511)) of 2018-05-31
-;; - smartrep.el ... Version 0.0.3
 ;; - yaxception.el ... Version 0.2.0
 ;; - log4e.el ... Version 0.2.0
 
@@ -100,7 +98,6 @@
 
 
 (eval-when-compile (require 'cl-lib))
-(require 'smartrep)
 (require 'log4e)
 (require 'yaxception)
 
@@ -131,7 +128,6 @@
 
 (defvar owdriver--window nil "Current window drived by the command of `owdriver-mode-map'.")
 (defvar owdriver--move-window-amount nil)
-(defvar owdriver--keymap-alist nil)
 
 
 ;;;;;;;;;;;;;
@@ -201,12 +197,50 @@
   :keymap owdriver-mode-map
   :global t
   :group 'owdriver
-  (smartrep-define-key owdriver-mode-map owdriver-prefix-key owdriver--keymap-alist))
+  (if owdriver-mode
+      (add-hook 'pre-command-hook 'owdriver--cleanup)
+    (remove-hook 'pre-command-hook 'owdriver--cleanup)))
 
 
 ;;;;;;;;;;;;;;;;;;
 ;; User Command
 
+(defvar owdriver--window-configuration nil)
+(defvar owdriver--marker nil)
+(defvar owdriver-keep-driving-commands '(owdriver-start owdriver-next-window owdriver-previous-window))
+(defvar owdriver-keep-driving-command-prefixes '("scroll-" "next-" "previous-" "forward-" "backward-" "beginning-of-" "end-of-" "move-" "switch-to-" "xref-" "find-" "isearch-" "project-" "projectile-"))
+(defvar owdriver-keep-driving-command-regexp (rx-to-string `(and bos (regexp ,(regexp-opt owdriver-keep-driving-command-prefixes)))))
+(defvar owdriver-keep-driving-function 'owdriver--keep-driving-with-default)
+
+(defun owdriver--keep-driving-with-default (command)
+  (or (memq command owdriver-keep-driving-commands)
+      (string-match owdriver-keep-driving-command-regexp (symbol-name command))))
+
+(defun owdriver--cleanup ()
+  (when (and owdriver-mode
+             (not (funcall owdriver-keep-driving-function this-command)))
+    (message "OWSTOP! %s" this-command)
+    (when owdriver--window-configuration
+      (set-window-configuration owdriver--window-configuration))
+    (when owdriver--marker
+      (select-window (get-buffer-window (marker-buffer owdriver--marker)))
+      (goto-char (marker-position owdriver--marker)))
+    (setq owdriver--window-configuration nil)
+    (setq owdriver--marker nil)
+    (owdriver-mode 0)))
+
+;;;###autoload
+(defun owdriver-start ()
+  "Start driving the window of `owdriver--window'."
+  (interactive)
+  (setq owdriver--marker (set-marker (make-marker) (point) (current-buffer)))
+  (setq owdriver--window-configuration (current-window-configuration))
+  (when (not (window-live-p owdriver--window))
+    (owdriver-next-window))
+  (select-window owdriver--window)
+  (owdriver-mode 1))
+
+;;;###autoload
 (defun owdriver-next-window (&optional reverse)
   "Change the window of `owdriver--window'."
   (interactive)
@@ -255,8 +289,6 @@
                 (yaxception:throw e))
               (yaxception:finally
                 (delete-overlay ov)))))
-        ;; Return to working window at last
-        (select-window actwnd)
         (setq owdriver--window nextwnd)
         (owdriver--show-message "Drived window is '%s'" owdriver--window)))
     (yaxception:catch 'error e
@@ -265,11 +297,13 @@
                       (yaxception:get-text e)
                       (yaxception:get-stack-trace-string e)))))
 
+;;;###autoload
 (defun owdriver-previous-window ()
   "Change the window of `owdriver--window'."
   (interactive)
   (owdriver-next-window t))
 
+;;;###autoload
 (defun owdriver-focus-window ()
   "Quit driving `owdriver--window' and move to `owdriver--window'."
   (interactive)
@@ -277,6 +311,7 @@
     (select-window owdriver--window)
     (keyboard-quit)))
 
+;;;###autoload
 (defun owdriver-quit ()
   "Quit driving `owdriver--window'."
   (interactive)
@@ -293,19 +328,13 @@
   (when (and (stringp keystroke)
              (not (string= keystroke ""))
              (commandp command))
-    (define-key owdriver-mode-map
-      (read-kbd-macro (concat owdriver-prefix-key " " keystroke))
-      command)
-    (owdriver--awhen (assoc keystroke owdriver--keymap-alist)
-      (setq owdriver--keymap-alist (delq it owdriver--keymap-alist)))
-    (add-to-list 'owdriver--keymap-alist `(,keystroke . ,command))))
+    (define-key owdriver-mode-map (read-kbd-macro keystroke) command)))
 
 ;;;###autoload
-(defmacro owdriver-define-command (command add-keymap &rest body)
+(defmacro owdriver-define-command (command &rest body)
   "Define the command for driving `owdriver--window' from COMMAND.
 
 The command named `owdriver-do-COMMAND' is defined by this function.
-ADD-KEYMAP is boolean. If non-nil, do `owdriver-add-keymap' using the key bound to COMMAND in `global-map'.
 BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is no need."
   (declare (indent 2))
   (let* ((body (or body `((call-interactively ',command))))
@@ -314,7 +343,7 @@ BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is n
          (fcommand (intern (concat "owdriver-do-" cmdnm "-on-next-window")))
          (tasknm (replace-regexp-in-string "-" " " cmdnm)))
     `(progn
-       (owdriver--trace "start define command[%s]. add-keymap[%s]" ,cmdnm ,add-keymap)
+       (owdriver--trace "start define command[%s]" ,cmdnm)
        ;;;###autoload
        (defun ,ncommand (&optional arg)
          ,(format "Do `%s' in `owdriver--window'.\n\nIf prefix argument is given, do `owdriver-next-window' before that." cmdnm)
@@ -322,14 +351,12 @@ BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is n
          (let ((force-next-window (and arg (> arg 1))))
            (owdriver--with-selected-window ,tasknm force-next-window
              ,@body)))
+       ;;;###autoload
        (defun ,fcommand ()
          ,(format "Do `%s' in `owdriver--window' with `owdriver-next-window'." cmdnm)
          (interactive)
          (owdriver--with-selected-window ,tasknm t
-           ,@body))
-       (when ,add-keymap
-         (dolist (k (owdriver--get-binding-keys ',command))
-           (owdriver-add-keymap k ',ncommand))))))
+           ,@body)))))
 
 ;;;###autoload
 (defun owdriver-config-default ()
@@ -339,26 +366,16 @@ BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is n
   (owdriver-add-keymap "C-S-o"      'owdriver-previous-window)
   (owdriver-add-keymap "<C-return>" 'owdriver-focus-window)
   ;; Basic command
-  (owdriver-define-command scroll-up               t)
-  (owdriver-define-command scroll-up-command       t)
-  (owdriver-define-command scroll-down             t)
-  (owdriver-define-command scroll-down-command     t)
-  (owdriver-define-command scroll-left             t (scroll-left 10 t))
-  (owdriver-define-command scroll-right            t (scroll-right 10 t))
-  (owdriver-define-command next-line               t)
-  (owdriver-define-command previous-line           t)
-  (owdriver-define-command forward-char            t)
-  (owdriver-define-command forward-word            t)
-  (owdriver-define-command backward-char           t)
-  (owdriver-define-command backward-word           t)
-  (owdriver-define-command move-beginning-of-line  t)
-  (owdriver-define-command move-end-of-line        t)
-  (owdriver-define-command beginning-of-buffer     t)
-  (owdriver-define-command end-of-buffer           t)
-  (owdriver-define-command isearch-forward         t (isearch-forward))
-  (owdriver-define-command isearch-backward        t (isearch-backward))
-  (owdriver-define-command set-mark-command        t)
-  (owdriver-define-command kill-ring-save          t (call-interactively 'kill-ring-save) (deactivate-mark))
+  (owdriver-define-command scroll-up)
+  (owdriver-define-command scroll-up-command)
+  (owdriver-define-command scroll-down)
+  (owdriver-define-command scroll-down-command)
+  (owdriver-define-command scroll-left (scroll-left 10 t))
+  (owdriver-define-command scroll-right (scroll-right 10 t))
+  (owdriver-define-command move-beginning-of-line)
+  (owdriver-define-command move-end-of-line)
+  (owdriver-define-command beginning-of-buffer)
+  (owdriver-define-command end-of-buffer)
 
   ;; Patch for Emacs 26.1
   (when (>= emacs-major-version 26)
