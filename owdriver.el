@@ -99,7 +99,7 @@
 ;; Enjoy!!!
 
 
-(eval-when-compile (require 'cl))
+(eval-when-compile (require 'cl-lib))
 (require 'smartrep)
 (require 'log4e)
 (require 'yaxception)
@@ -137,7 +137,7 @@
 ;;;;;;;;;;;;;
 ;; Utility
 
-(defun* owdriver--show-message (msg &rest args)
+(cl-defun owdriver--show-message (msg &rest args)
   (apply 'message (concat "[OWDRIVER] " msg) args)
   nil)
 
@@ -167,24 +167,24 @@
 
 (defun owdriver--get-binding-keys (cmd)
   (owdriver--trace "start get binding keys : %s" cmd)
-  (loop for b in (where-is-internal cmd global-map)
-        for bindkey = (or (ignore-errors (key-description b))
-                          "")
-        if (and (not (string= bindkey ""))
-                (not (string-match "\\`<menu-bar>" bindkey))
-                (not (string-match "\\`<[^>]*mouse[^>]*>" bindkey)))
-        collect (progn (owdriver--trace "found binding : %s" bindkey)
-                       bindkey)))
+  (cl-loop for b in (where-is-internal cmd global-map)
+           for bindkey = (or (ignore-errors (key-description b))
+                             "")
+           if (and (not (string= bindkey ""))
+                   (not (string-match "\\`<menu-bar>" bindkey))
+                   (not (string-match "\\`<[^>]*mouse[^>]*>" bindkey)))
+           collect (progn (owdriver--trace "found binding : %s" bindkey)
+                          bindkey)))
 
 (defun owdriver--get-keybind (cmd)
   (owdriver--trace "start get keybind : %s" cmd)
-  (loop with ret = nil
-        for k in (owdriver--get-binding-keys cmd)
-        if (or (not ret)
-               (< (length k) (length ret)))
-        do (setq ret k)
-        finally return (progn (owdriver--trace "got keybind : %s" ret)
-                              ret)))
+  (cl-loop with ret = nil
+           for k in (owdriver--get-binding-keys cmd)
+           if (or (not ret)
+                  (< (length k) (length ret)))
+           do (setq ret k)
+           finally return (progn (owdriver--trace "got keybind : %s" ret)
+                                 ret)))
 
 
 ;;;;;;;;;;
@@ -230,7 +230,7 @@
         (if (and (and owdriver-next-window-prefer-pophint
                       (featurep 'pophint)
                       (boundp 'pophint--next-window-source)
-                      (>= (loop for w in (window-list) count (funcall is-nextable-window w)) 2)))
+                      (>= (cl-loop for w in (window-list) count (funcall is-nextable-window w)) 2)))
             (setq nextwnd (when-let ((hint (pophint:do :source pophint--next-window-source :allwindow t)))
                             (pophint:hint-window hint)))
           (while (and (> move-amount 0)
@@ -239,7 +239,7 @@
             (setq nextwnd (get-buffer-window))
             (owdriver--trace "selected next window : %s" nextwnd)
             (when (funcall is-nextable-window nextwnd)
-              (decf move-amount)
+              (cl-decf move-amount)
               (owdriver--trace "decremented move-amount[%s]" move-amount))))
         ;; Blink target window after move
         (when (not (eq nextwnd currwnd))
