@@ -103,8 +103,6 @@
 (require 'smartrep)
 (require 'log4e)
 (require 'yaxception)
-(require 'inertial-scroll nil t)
-(require 'pophint nil t)
 
 (defgroup owdriver nil
   "Quickly perform various actions on other windows."
@@ -364,10 +362,6 @@ BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is n
   (owdriver-define-command isearch-backward        t (isearch-backward))
   (owdriver-define-command set-mark-command        t)
   (owdriver-define-command kill-ring-save          t (call-interactively 'kill-ring-save) (deactivate-mark))
-  ;; Third party command
-  (owdriver-define-command pophint:do t (pophint:do :not-switch-window t))
-  (owdriver-define-command inertias-up t)
-  (owdriver-define-command inertias-down t)
 
   ;; Patch for Emacs 26.1
   (when (>= emacs-major-version 26)
