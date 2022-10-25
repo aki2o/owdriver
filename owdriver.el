@@ -240,7 +240,8 @@
   (setq owdriver--window-configuration (current-window-configuration))
   (when (not (window-live-p owdriver--window))
     (owdriver-next-window))
-  (select-window owdriver--window)
+  (when (not (eq (get-buffer-window) owdriver--window))
+    (select-window owdriver--window))
   (owdriver-mode 1))
 
 ;;;###autoload
