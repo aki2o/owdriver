@@ -147,11 +147,11 @@
      (yaxception:try
        (owdriver--trace "start with select window : wnd[%s] force-next-window[%s]"
                         owdriver--window ,force-next-window)
-       (when (or ,force-next-window
-                 (not (window-live-p owdriver--window))
-                 (eq owdriver--window (nth 0 (get-buffer-window-list))))
-         (let ((owdriver--move-window-amount 1))
-           (owdriver-next-window)))
+       (when (or ,force-next-window (not (window-live-p owdriver--window)))
+         (let ((owdriver--move-window-amount 1)
+               (w (get-buffer-window)))
+           (owdriver-next-window)
+           (select-window w)))
        (with-selected-window owdriver--window
          ,@body))
      (yaxception:catch 'error e
