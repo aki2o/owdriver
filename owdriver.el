@@ -222,7 +222,7 @@
 (defun owdriver--cleanup ()
   (when (and owdriver-mode
              (not (funcall owdriver-keep-driving-function this-command)))
-    (message "OWSTOP! %s" this-command)
+    (owdriver--trace "start cleanup. this-command[%s]" this-command)
     (when owdriver--window-configuration
       (set-window-configuration owdriver--window-configuration))
     (when owdriver--marker
