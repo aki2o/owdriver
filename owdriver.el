@@ -141,23 +141,20 @@
   (declare (indent 1))
   `(let ((it ,test)) (when it ,@body)))
 
-(defmacro owdriver--with-selected-window (tasknm force-next-window &rest body)
+(defmacro owdriver--with-selected-window (command force-next-window &rest body)
   (declare (indent 2))
   `(yaxception:$
      (yaxception:try
        (owdriver--trace "start with select window : wnd[%s] force-next-window[%s]"
                         owdriver--window ,force-next-window)
-       (when (or ,force-next-window (not (window-live-p owdriver--window)))
-         (let ((owdriver--move-window-amount 1)
-               (w (get-buffer-window)))
-           (owdriver-next-window)
-           (select-window w)))
-       (with-selected-window owdriver--window
+       (let ((owdriver--move-window-amount 1)
+             (owdriver-keep-driving-function (lambda (c) (eq c ',command))))
+         (owdriver-start ,force-next-window)
          ,@body))
      (yaxception:catch 'error e
-       (owdriver--show-message "Failed %s : %s" ,tasknm (yaxception:get-text e))
+       (owdriver--show-message "Failed %s : %s" ',command (yaxception:get-text e))
        (owdriver--error "failed %s : %s\n%s"
-                       ,tasknm
+                       ',command
                        (yaxception:get-text e)
                        (yaxception:get-stack-trace-string e)))))
 
@@ -223,9 +220,10 @@
   (when (and owdriver-mode
              (not (funcall owdriver-keep-driving-function this-command)))
     (owdriver--trace "start cleanup. this-command[%s]" this-command)
-    (when owdriver--window-configuration
-      (set-window-configuration owdriver--window-configuration))
     (when owdriver--marker
+      (when (and (not (window-live-p (get-buffer-window (marker-buffer owdriver--marker))))
+                 owdriver--window-configuration)
+        (set-window-configuration owdriver--window-configuration))
       (select-window (get-buffer-window (marker-buffer owdriver--marker)))
       (goto-char (marker-position owdriver--marker)))
     (setq owdriver--window-configuration nil)
@@ -233,12 +231,13 @@
     (owdriver-mode 0)))
 
 ;;;###autoload
-(defun owdriver-start ()
+(defun owdriver-start (&optional force-next-window)
   "Start driving the window of `owdriver--window'."
   (interactive)
   (setq owdriver--marker (set-marker (make-marker) (point) (current-buffer)))
   (setq owdriver--window-configuration (current-window-configuration))
-  (when (not (window-live-p owdriver--window))
+  (when (or force-next-window
+            (not (window-live-p owdriver--window)))
     (owdriver-next-window))
   (when (not (eq (get-buffer-window) owdriver--window))
     (select-window owdriver--window))
@@ -344,8 +343,7 @@ BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is n
   (let* ((body (or body `((call-interactively ',command))))
          (cmdnm (symbol-name command))
          (ncommand (intern (concat "owdriver-do-" cmdnm)))
-         (fcommand (intern (concat "owdriver-do-" cmdnm "-on-next-window")))
-         (tasknm (replace-regexp-in-string "-" " " cmdnm)))
+         (fcommand (intern (concat "owdriver-do-" cmdnm "-on-next-window"))))
     `(progn
        (owdriver--trace "start define command[%s]" ,cmdnm)
        ;;;###autoload
@@ -353,13 +351,13 @@ BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is n
          ,(format "Do `%s' in `owdriver--window'.\n\nIf prefix argument is given, do `owdriver-next-window' before that." cmdnm)
          (interactive "p")
          (let ((force-next-window (and arg (> arg 1))))
-           (owdriver--with-selected-window ,tasknm force-next-window
+           (owdriver--with-selected-window ,ncommand force-next-window
              ,@body)))
        ;;;###autoload
        (defun ,fcommand ()
          ,(format "Do `%s' in `owdriver--window' with `owdriver-next-window'." cmdnm)
          (interactive)
-         (owdriver--with-selected-window ,tasknm t
+         (owdriver--with-selected-window ,fcommand t
            ,@body)))))
 
 ;;;###autoload
