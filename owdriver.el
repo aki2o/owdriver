@@ -87,7 +87,6 @@ This value will be ignored if set `owdriver-keep-driving-command-regexp' non-nil
 
 
 (defvar owdriver--window nil "Current window drived by the command of `owdriver-mode-map'.")
-(defvar owdriver--move-window-amount nil)
 (defvar owdriver--start-location nil)
 (defvar owdriver--keep-driving-function nil)
 
@@ -109,8 +108,7 @@ This value will be ignored if set `owdriver-keep-driving-command-regexp' non-nil
      (yaxception:try
        (owdriver--trace "start with select window : wnd[%s] force-next-window[%s]"
                         owdriver--window ,force-next-window)
-       (let ((owdriver--move-window-amount 1)
-             (owdriver-keep-driving-function (lambda (c) nil)))
+       (let ((owdriver-keep-driving-function (lambda (c) nil)))
          (owdriver-start ,force-next-window)
          ,@body))
      (yaxception:catch 'error e
@@ -153,59 +151,24 @@ This value will be ignored if set `owdriver-keep-driving-command-regexp' non-nil
 ;;;;;;;;;;;;;;
 ;; Function
 
-(defun owdriver-find-next-window (&optional reverse)
-  (yaxception:$
-    (yaxception:try
-      (let* ((actwnd (get-buffer-window))
-             (currwnd (if (window-live-p owdriver--window) owdriver--window actwnd))
-             (move-amount (or owdriver--move-window-amount
-                              (when (window-live-p owdriver--window) 1)
-                              2))
-             (is-nextable-window (lambda (w)
-                                   (and (window-live-p w)
-                                        (not (eq w actwnd))
-                                        (not (eq w currwnd))
-                                        (not (minibufferp (window-buffer w))))))
-             nextwnd popwnd wndloc)
-        (select-window currwnd)
-        (owdriver--trace "start %s window. currwnd[%s] move-amount[%s]"
-                         (if reverse "previous" "next") (selected-window) move-amount)
-        ;; Move to next target window
-        (if (and (and owdriver-next-window-prefer-pophint
-                      (featurep 'pophint)
-                      (boundp 'pophint--next-window-source)
-                      (>= (cl-loop for w in (window-list) count (funcall is-nextable-window w)) 2)))
-            (setq nextwnd (when-let ((hint (pophint:do :source pophint--next-window-source :allwindow t)))
-                            (pophint:hint-window hint)))
-          (while (and (> move-amount 0)
-                      (not (eq nextwnd currwnd)))
-            (other-window (if reverse -1 1))
-            (setq nextwnd (get-buffer-window))
-            (owdriver--trace "selected next window : %s" nextwnd)
-            (when (funcall is-nextable-window nextwnd)
-              (cl-decf move-amount)
-              (owdriver--trace "decremented move-amount[%s]" move-amount))))
-        ;; Blink target window after move
-        (when (not (eq nextwnd currwnd))
-          (owdriver--trace "start blink window : %s" nextwnd)
-          (let ((ov (make-overlay (window-start) (window-end))))
-            (yaxception:$
-              (yaxception:try
-                (overlay-put ov 'face 'highlight)
-                (select-window actwnd)
-                (sit-for 0.1)
-                (select-window nextwnd))
-              (yaxception:catch 'error e
-                (yaxception:throw e))
-              (yaxception:finally
-                (delete-overlay ov)))))
-        (setq owdriver--window nextwnd)
-        (owdriver--show-message "Drived window is '%s'" owdriver--window)))
-    (yaxception:catch 'error e
-      (owdriver--show-message "Failed next window : %s" (yaxception:get-text e))
-      (owdriver--error "failed next window : %s\n%s"
-                      (yaxception:get-text e)
-                      (yaxception:get-stack-trace-string e)))))
+(defun owdriver-find-next-window (reverse)
+  (let* ((actwnd (get-buffer-window))
+         (currwnd (if (window-live-p owdriver--window) owdriver--window actwnd))
+         (is-nextable-window (lambda (w)
+                               (and (window-live-p w)
+                                    (not (eq w actwnd))
+                                    (not (eq w currwnd))
+                                    (not (minibufferp (window-buffer w)))))))
+    (or (and owdriver-next-window-prefer-pophint
+             (featurep 'pophint)
+             (boundp 'pophint--next-window-source)
+             (>= (cl-loop for w in (window-list) count (funcall is-nextable-window w)) 2)
+             (when-let ((hint (pophint:do :source pophint--next-window-source :allwindow t)))
+               (pophint:hint-window hint)))
+        (progn
+          (select-window currwnd)
+          (other-window (if reverse -1 1))
+          (selected-window)))))
 
 (defun owdriver-keep-driving-p (command)
   (when (not owdriver-keep-driving-command-regexp)
@@ -255,20 +218,32 @@ This value will be ignored if set `owdriver-keep-driving-command-regexp' non-nil
   (when (or force-next-window
             (not (window-live-p owdriver--window)))
     (owdriver-next-window))
-  (when (not (eq (get-buffer-window) owdriver--window))
+  (when (not (eq (selected-window) owdriver--window))
     (select-window owdriver--window)))
 
 ;;;###autoload
-(defun owdriver-next-window ()
+(defun owdriver-next-window (&optional reverse)
   "Change the window of `owdriver--window'."
   (interactive)
-  (funcall owdriver-next-window-function nil))
+  (yaxception:$
+    (yaxception:try
+      (setq owdriver--window (funcall owdriver-next-window-function reverse))
+      (select-window owdriver--window)
+      (lexical-let ((ov (make-overlay (point-min) (point-max))))
+        (overlay-put ov 'face 'highlight)
+        (run-with-idle-timer 0.1 nil (lambda () (when ov (delete-overlay ov))))
+        (owdriver--show-message "Drived window is '%s'" owdriver--window)))
+    (yaxception:catch 'error e
+      (owdriver--show-message "Failed next window : %s" (yaxception:get-text e))
+      (owdriver--error "failed next window : %s\n%s"
+                       (yaxception:get-text e)
+                       (yaxception:get-stack-trace-string e)))))
 
 ;;;###autoload
 (defun owdriver-previous-window ()
   "Change the window of `owdriver--window'."
   (interactive)
-  (funcall owdriver-next-window-function t))
+  (owdriver-next-window t))
 
 ;;;###autoload
 (defun owdriver-focus-window ()
