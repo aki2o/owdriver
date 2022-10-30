@@ -50,6 +50,11 @@
   :type 'boolean
   :group 'owdriver)
 
+(defvar owdriver-keep-driving-commands '(owdriver-start owdriver-next-window owdriver-previous-window))
+(defvar owdriver-keep-driving-command-prefixes '("scroll-" "next-" "previous-" "forward-" "backward-" "beginning-of-" "end-of-" "move-" "switch-to-" "xref-" "find-" "isearch-" "project-" "projectile-"))
+(defvar owdriver-keep-driving-command-regexp nil)
+(defvar owdriver-keep-driving-function 'owdriver--keep-driving-with-default)
+
 
 (log4e:deflogger "owdriver" "%t [%l] %m" "%H:%M:%S" '((fatal . "fatal")
                                                       (error . "error")
@@ -62,6 +67,8 @@
 
 (defvar owdriver--window nil "Current window drived by the command of `owdriver-mode-map'.")
 (defvar owdriver--move-window-amount nil)
+(defvar owdriver--start-location nil)
+(defvar owdriver--keep-driving-function nil)
 
 
 ;;;;;;;;;;;;;
@@ -113,51 +120,6 @@
            finally return (progn (owdriver--trace "got keybind : %s" ret)
                                  ret)))
 
-
-;;;;;;;;;;
-;; Mode
-
-(defvar owdriver-keep-driving-commands '(owdriver-start owdriver-next-window owdriver-previous-window))
-(defvar owdriver-keep-driving-command-prefixes '("scroll-" "next-" "previous-" "forward-" "backward-" "beginning-of-" "end-of-" "move-" "switch-to-" "xref-" "find-" "isearch-" "project-" "projectile-"))
-(defvar owdriver-keep-driving-command-regexp nil)
-(defvar owdriver-keep-driving-function 'owdriver--keep-driving-with-default)
-
-;;;###autoload
-(defvar owdriver-mode-map (make-sparse-keymap))
-
-(defvar owdriver--window-configuration nil)
-(defvar owdriver--marker nil)
-(defvar owdriver--keep-driving-function nil)
-
-;;;###autoload
-(define-minor-mode owdriver-mode
-  "Quickly perform various actions on other windows."
-  :init-value nil
-  :lighter " OW"
-  :keymap owdriver-mode-map
-  :global t
-  :group 'owdriver
-  (if owdriver-mode
-      (progn
-        (setq owdriver--marker (set-marker (make-marker) (point) (current-buffer)))
-        (setq owdriver--window-configuration (current-window-configuration))
-        (setq owdriver--keep-driving-function owdriver-keep-driving-function)
-        (add-hook 'pre-command-hook 'owdriver--cleanup))
-    (when owdriver--marker
-      (when  (and (not (window-live-p (get-buffer-window (marker-buffer owdriver--marker))))
-                  owdriver--window-configuration)
-        (set-window-configuration owdriver--window-configuration))
-      (select-window (get-buffer-window (marker-buffer owdriver--marker)))
-      (goto-char (marker-position owdriver--marker)))
-    (setq owdriver--marker nil)
-    (setq owdriver--window-configuration nil)
-    (setq owdriver--keep-driving-function nil)
-    (remove-hook 'pre-command-hook 'owdriver--cleanup)))
-
-
-;;;;;;;;;;;;;;;;;;
-;; User Command
-
 (defun owdriver--keep-driving-with-default (command)
   (when (not owdriver-keep-driving-command-regexp)
     (setq owdriver-keep-driving-command-regexp
@@ -170,8 +132,41 @@
              (not (active-minibuffer-window))
              (functionp owdriver--keep-driving-function)
              (not (funcall owdriver--keep-driving-function this-command)))
-    (message "start cleanup. this-command[%s]" this-command)
+    (owdriver--trace "start cleanup. this-command[%s]" this-command)
     (owdriver-mode 0)))
+
+
+;;;;;;;;;;
+;; Mode
+
+;;;###autoload
+(defvar owdriver-mode-map (make-sparse-keymap))
+
+;;;###autoload
+(define-minor-mode owdriver-mode
+  "Quickly perform various actions on other windows."
+  :init-value nil
+  :lighter " OW"
+  :keymap owdriver-mode-map
+  :global t
+  :group 'owdriver
+  (if owdriver-mode
+      (progn
+        (setq owdriver--start-location `(:window ,(selected-window) :point ,(window-point), :config ,(current-window-configuration)))
+        (setq owdriver--keep-driving-function owdriver-keep-driving-function)
+        (add-hook 'pre-command-hook 'owdriver--cleanup))
+    (when owdriver--start-location
+      (when (not (window-live-p (plist-get owdriver--start-location :window)))
+        (set-window-configuration (plist-get owdriver--start-location :config)))
+      (select-window (plist-get owdriver--start-location :window))
+      (set-window-point (plist-get owdriver--start-location :window) (plist-get owdriver--start-location :point))
+      (setq owdriver--start-location nil))
+    (setq owdriver--keep-driving-function nil)
+    (remove-hook 'pre-command-hook 'owdriver--cleanup)))
+
+
+;;;;;;;;;;;;;;;;;;
+;; User Command
 
 ;;;###autoload
 (defun owdriver-start (&optional force-next-window)
