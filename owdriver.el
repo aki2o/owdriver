@@ -311,8 +311,6 @@ BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is n
   (owdriver-define-command scroll-down-command)
   (owdriver-define-command scroll-left (scroll-left 10 t))
   (owdriver-define-command scroll-right (scroll-right 10 t))
-  (owdriver-define-command move-beginning-of-line)
-  (owdriver-define-command move-end-of-line)
   (owdriver-define-command beginning-of-buffer)
   (owdriver-define-command end-of-buffer)
 
