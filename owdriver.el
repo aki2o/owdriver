@@ -46,32 +46,32 @@
   :group 'owdriver)
 
 (defcustom owdriver-next-window-prefer-pophint t
-  "Whether to prefer to use `pophint:do' for `owdriver--default-next-window'."
+  "Whether to prefer to use `pophint:do' for `owdriver-find-next-window'."
   :type 'boolean
   :group 'owdriver)
 
-(defcustom owdriver-next-window-function 'owdriver--default-next-window
+(defcustom owdriver-next-window-function 'owdriver-find-next-window
   "Function to find a next window handled by owdriver."
   :type 'function
   :group 'owdriver)
 
 (defcustom owdriver-keep-driving-commands '(owdriver-start owdriver-next-window owdriver-previous-window)
-  "List of command kept handling by `owdriver--keep-driving-with-default'."
+  "List of command kept handling by `owdriver-keep-driving-p'."
   :type (list 'function)
   :group 'owdriver)
 
 (defcustom owdriver-keep-driving-command-prefixes '("scroll-" "next-" "previous-" "forward-" "backward-" "beginning-of-" "end-of-" "move-" "switch-to-" "xref-" "find-" "isearch-" "project-" "projectile-")
-  "List of command prefix kept handling by `owdriver--keep-driving-with-default'.
+  "List of command prefix kept handling by `owdriver-keep-driving-p'.
 This value will be ignored if set `owdriver-keep-driving-command-regexp' non-nil."
   :type (list 'string)
   :group 'owdriver)
 
 (defcustom owdriver-keep-driving-command-regexp nil
-  "Regexp for matching commands kept handling by `owdriver--keep-driving-with-default'."
+  "Regexp for matching commands kept handling by `owdriver-keep-driving-p'."
   :type 'regexp
   :group 'owdriver)
 
-(defcustom owdriver-keep-driving-function 'owdriver--keep-driving-with-default
+(defcustom owdriver-keep-driving-function 'owdriver-keep-driving-p
   "Function to judge to keep handling by owdriver."
   :type 'function
   :group 'owdriver)
@@ -149,14 +149,11 @@ This value will be ignored if set `owdriver-keep-driving-command-regexp' non-nil
     (owdriver--trace "start cleanup. this-command[%s]" this-command)
     (owdriver-mode 0)))
 
-(defun owdriver--keep-driving-with-default (command)
-  (when (not owdriver-keep-driving-command-regexp)
-    (setq owdriver-keep-driving-command-regexp
-          (rx-to-string `(and bos (regexp ,(regexp-opt owdriver-keep-driving-command-prefixes))))))
-  (or (memq command owdriver-keep-driving-commands)
-      (string-match owdriver-keep-driving-command-regexp (symbol-name command))))
 
-(defun owdriver--default-next-window (&optional reverse)
+;;;;;;;;;;;;;;
+;; Function
+
+(defun owdriver-find-next-window (&optional reverse)
   (yaxception:$
     (yaxception:try
       (let* ((actwnd (get-buffer-window))
@@ -210,6 +207,13 @@ This value will be ignored if set `owdriver-keep-driving-command-regexp' non-nil
                       (yaxception:get-text e)
                       (yaxception:get-stack-trace-string e)))))
 
+(defun owdriver-keep-driving-p (command)
+  (when (not owdriver-keep-driving-command-regexp)
+    (setq owdriver-keep-driving-command-regexp
+          (rx-to-string `(and bos (regexp ,(regexp-opt owdriver-keep-driving-command-prefixes))))))
+  (or (memq command owdriver-keep-driving-commands)
+      (string-match owdriver-keep-driving-command-regexp (symbol-name command))))
+
 
 ;;;;;;;;;;
 ;; Mode
@@ -258,7 +262,7 @@ This value will be ignored if set `owdriver-keep-driving-command-regexp' non-nil
 (defun owdriver-next-window ()
   "Change the window of `owdriver--window'."
   (interactive)
-  (funcall owdriver-next-window-function))
+  (funcall owdriver-next-window-function nil))
 
 ;;;###autoload
 (defun owdriver-previous-window ()
