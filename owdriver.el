@@ -148,7 +148,7 @@
        (owdriver--trace "start with select window : wnd[%s] force-next-window[%s]"
                         owdriver--window ,force-next-window)
        (let ((owdriver--move-window-amount 1)
-             (owdriver-keep-driving-function (lambda (c) (eq c ',command))))
+             (owdriver-keep-driving-function (lambda (c) nil)))
          (owdriver-start ,force-next-window)
          ,@body))
      (yaxception:catch 'error e
