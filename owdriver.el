@@ -27,75 +27,9 @@
 ;; other windows quickly in multi window situation.
 ;; In default, that's move, scroll and isearch.
 ;; Moreover, you can add the action what you want.
-
-;;; Dependency:
-;; 
-;; - yaxception.el ( see <https://github.com/aki2o/yaxception> )
-;; - log4e.el ( see <https://github.com/aki2o/log4e> )
-
-;;; Installation:
-;;
-;; Put this to your load-path.
-;; And put the following lines in your .emacs or site-start.el file.
-;; 
-;; (require 'owdriver)
-
-;;; Configuration:
-;; 
-;; ;; Make config suit for you. About the config item, see Customization or eval the following sexp.
-;; ;; (customize-group "owdriver")
-;; 
-;; ;; If you want to do the default config
-;; (owdriver-config-default)
-;; 
-;; (owdriver-mode 1)
-
-;;; Customization:
-;; 
-;; [EVAL] (autodoc-document-lisp-buffer :type 'user-variable :prefix "owdriver-[^-]" :docstring t)
-;; `owdriver-prefix-key'
-;; String of the prefix keystroke for `owdriver-mode-map'.
-;; `owdriver-next-window-prefer-pophint'
-;; Whether to prefer to use `pophint:do' for `owdriver-next-window'.
-;; 
-;;  *** END auto-documentation
-
-;;; API:
-;; 
-;; [EVAL] (autodoc-document-lisp-buffer :type 'command :prefix "owdriver-[^-]" :docstring t)
-;; `owdriver-next-window'
-;; Change the window of `owdriver--window'.
-;; `owdriver-previous-window'
-;; Change the window of `owdriver--window'.
-;; `owdriver-focus-window'
-;; Quit driving `owdriver--window' and move to `owdriver--window'.
-;; `owdriver-quit'
-;; Quit driving `owdriver--window'.
-;; 
-;;  *** END auto-documentation
-;; [EVAL] (autodoc-document-lisp-buffer :type 'macro :prefix "owdriver-[^-]" :docstring t)
-;; `owdriver-define-command'
-;; Define the command for driving `owdriver--window' from COMMAND.
-;; 
-;;  *** END auto-documentation
-;; [EVAL] (autodoc-document-lisp-buffer :type 'function :prefix "owdriver-[^-]" :docstring t)
-;; `owdriver-add-keymap'
-;; Add the keymap of `owdriver-mode-map'.
-;; `owdriver-config-default'
-;; Do the recommended configuration.
-;; 
-;;  *** END auto-documentation
-;; [Note] Functions and variables other than listed above, Those specifications may be changed without notice.
-
-;;; Tested On:
-;; 
-;; - Emacs ... GNU Emacs 26.1 (build 1, x86_64-apple-darwin14.5.0, NS appkit-1348.17 Version 10.10.5 (Build 14F2511)) of 2018-05-31
-;; - yaxception.el ... Version 0.2.0
-;; - log4e.el ... Version 0.2.0
-
-
 ;; Enjoy!!!
 
+;;; Code:
 
 (eval-when-compile (require 'cl-lib))
 (require 'log4e)
@@ -183,8 +117,17 @@
 ;;;;;;;;;;
 ;; Mode
 
+(defvar owdriver-keep-driving-commands '(owdriver-start owdriver-next-window owdriver-previous-window))
+(defvar owdriver-keep-driving-command-prefixes '("scroll-" "next-" "previous-" "forward-" "backward-" "beginning-of-" "end-of-" "move-" "switch-to-" "xref-" "find-" "isearch-" "project-" "projectile-"))
+(defvar owdriver-keep-driving-command-regexp nil)
+(defvar owdriver-keep-driving-function 'owdriver--keep-driving-with-default)
+
 ;;;###autoload
 (defvar owdriver-mode-map (make-sparse-keymap))
+
+(defvar owdriver--window-configuration nil)
+(defvar owdriver--marker nil)
+(defvar owdriver--keep-driving-function nil)
 
 ;;;###autoload
 (define-minor-mode owdriver-mode
@@ -195,19 +138,25 @@
   :global t
   :group 'owdriver
   (if owdriver-mode
-      (add-hook 'pre-command-hook 'owdriver--cleanup)
+      (progn
+        (setq owdriver--marker (set-marker (make-marker) (point) (current-buffer)))
+        (setq owdriver--window-configuration (current-window-configuration))
+        (setq owdriver--keep-driving-function owdriver-keep-driving-function)
+        (add-hook 'pre-command-hook 'owdriver--cleanup))
+    (when owdriver--marker
+      (when  (and (not (window-live-p (get-buffer-window (marker-buffer owdriver--marker))))
+                  owdriver--window-configuration)
+        (set-window-configuration owdriver--window-configuration))
+      (select-window (get-buffer-window (marker-buffer owdriver--marker)))
+      (goto-char (marker-position owdriver--marker)))
+    (setq owdriver--marker nil)
+    (setq owdriver--window-configuration nil)
+    (setq owdriver--keep-driving-function nil)
     (remove-hook 'pre-command-hook 'owdriver--cleanup)))
 
 
 ;;;;;;;;;;;;;;;;;;
 ;; User Command
-
-(defvar owdriver--window-configuration nil)
-(defvar owdriver--marker nil)
-(defvar owdriver-keep-driving-commands '(owdriver-start owdriver-next-window owdriver-previous-window))
-(defvar owdriver-keep-driving-command-prefixes '("scroll-" "next-" "previous-" "forward-" "backward-" "beginning-of-" "end-of-" "move-" "switch-to-" "xref-" "find-" "isearch-" "project-" "projectile-"))
-(defvar owdriver-keep-driving-command-regexp nil)
-(defvar owdriver-keep-driving-function 'owdriver--keep-driving-with-default)
 
 (defun owdriver--keep-driving-with-default (command)
   (when (not owdriver-keep-driving-command-regexp)
@@ -218,30 +167,22 @@
 
 (defun owdriver--cleanup ()
   (when (and owdriver-mode
-             (not (funcall owdriver-keep-driving-function this-command)))
-    (owdriver--trace "start cleanup. this-command[%s]" this-command)
-    (when owdriver--marker
-      (when (and (not (window-live-p (get-buffer-window (marker-buffer owdriver--marker))))
-                 owdriver--window-configuration)
-        (set-window-configuration owdriver--window-configuration))
-      (select-window (get-buffer-window (marker-buffer owdriver--marker)))
-      (goto-char (marker-position owdriver--marker)))
-    (setq owdriver--window-configuration nil)
-    (setq owdriver--marker nil)
+             (not (active-minibuffer-window))
+             (functionp owdriver--keep-driving-function)
+             (not (funcall owdriver--keep-driving-function this-command)))
+    (message "start cleanup. this-command[%s]" this-command)
     (owdriver-mode 0)))
 
 ;;;###autoload
 (defun owdriver-start (&optional force-next-window)
   "Start driving the window of `owdriver--window'."
   (interactive)
-  (setq owdriver--marker (set-marker (make-marker) (point) (current-buffer)))
-  (setq owdriver--window-configuration (current-window-configuration))
+  (owdriver-mode 1)
   (when (or force-next-window
             (not (window-live-p owdriver--window)))
     (owdriver-next-window))
   (when (not (eq (get-buffer-window) owdriver--window))
-    (select-window owdriver--window))
-  (owdriver-mode 1))
+    (select-window owdriver--window)))
 
 ;;;###autoload
 (defun owdriver-next-window (&optional reverse)
