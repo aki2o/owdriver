@@ -50,10 +50,26 @@
   :type 'boolean
   :group 'owdriver)
 
-(defvar owdriver-keep-driving-commands '(owdriver-start owdriver-next-window owdriver-previous-window))
-(defvar owdriver-keep-driving-command-prefixes '("scroll-" "next-" "previous-" "forward-" "backward-" "beginning-of-" "end-of-" "move-" "switch-to-" "xref-" "find-" "isearch-" "project-" "projectile-"))
-(defvar owdriver-keep-driving-command-regexp nil)
-(defvar owdriver-keep-driving-function 'owdriver--keep-driving-with-default)
+(defcustom owdriver-keep-driving-commands '(owdriver-start owdriver-next-window owdriver-previous-window)
+  "List of command kept handling by `owdriver--keep-driving-with-default'."
+  :type (list 'function)
+  :group 'owdriver)
+
+(defcustom owdriver-keep-driving-command-prefixes '("scroll-" "next-" "previous-" "forward-" "backward-" "beginning-of-" "end-of-" "move-" "switch-to-" "xref-" "find-" "isearch-" "project-" "projectile-")
+  "List of command prefix kept handling by `owdriver--keep-driving-with-default'.
+This value will be ignored if set `owdriver-keep-driving-command-regexp' non-nil."
+  :type (list 'string)
+  :group 'owdriver)
+
+(defcustom owdriver-keep-driving-command-regexp nil
+  "Regexp for matching commands kept handling by `owdriver--keep-driving-with-default'."
+  :type 'regexp
+  :group 'owdriver)
+
+(defcustom owdriver-keep-driving-function 'owdriver--keep-driving-with-default
+  "Function to judge to keep handling by owdriver."
+  :type 'function
+  :group 'owdriver)
 
 
 (log4e:deflogger "owdriver" "%t [%l] %m" "%H:%M:%S" '((fatal . "fatal")
