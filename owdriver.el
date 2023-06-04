@@ -5,7 +5,7 @@
 ;; Author: Hiroaki Otsu <ootsuhiroaki@gmail.com>
 ;; Keywords: convenience
 ;; URL: https://github.com/aki2o/owdriver
-;; Version: 0.2.0
+;; Version: 0.3.0
 ;; Package-Requires: ((log4e "0.2.0") (yaxception "0.2.0"))
 
 ;; This program is free software; you can redistribute it and/or modify
