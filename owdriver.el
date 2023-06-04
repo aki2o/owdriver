@@ -108,7 +108,7 @@ This value will be ignored if set `owdriver-keep-driving-command-regexp' non-nil
      (yaxception:try
        (owdriver--trace "start with select window : wnd[%s] force-next-window[%s]"
                         owdriver--window ,force-next-window)
-       (let ((owdriver-keep-driving-function (lambda (c) nil)))
+       (let ((owdriver-keep-driving-function nil))
          (owdriver-start ,force-next-window)
          ,@body))
      (yaxception:catch 'error e
@@ -141,9 +141,8 @@ This value will be ignored if set `owdriver-keep-driving-command-regexp' non-nil
 
 (defun owdriver--cleanup ()
   (when (and owdriver-mode
-             (not (active-minibuffer-window))
-             (functionp owdriver--keep-driving-function)
-             (not (funcall owdriver--keep-driving-function this-command)))
+             (or (not (functionp owdriver--keep-driving-function))
+                 (not (funcall owdriver--keep-driving-function this-command))))
     (owdriver--trace "start cleanup. this-command[%s]" this-command)
     (owdriver-mode 0)))
 
