@@ -1,12 +1,12 @@
-;;; owdriver.el --- Quickly perform various actions on other windows
+;;; owdriver.el --- Quickly perform various actions on other windows  -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2014  Hiroaki Otsu
 
 ;; Author: Hiroaki Otsu <ootsuhiroaki@gmail.com>
 ;; Keywords: convenience
 ;; URL: https://github.com/aki2o/owdriver
-;; Version: 0.3.0
-;; Package-Requires: ((log4e "0.2.0") (yaxception "0.2.0"))
+;; Version: 0.3.1
+;; Package-Requires: ((log4e "0.4.1") (yaxception "1.0.0"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -62,7 +62,7 @@
 
 (defcustom owdriver-keep-driving-command-prefixes '("scroll-" "next-" "previous-" "forward-" "backward-" "beginning-of-" "end-of-" "move-" "switch-to-" "xref-" "find-" "isearch-" "project-" "projectile-")
   "List of command prefix kept handling by `owdriver-keep-driving-p'.
-This value will be ignored if set `owdriver-keep-driving-command-regexp' non-nil."
+This will be ignored if set `owdriver-keep-driving-command-regexp' non-nil."
   :type (list 'string)
   :group 'owdriver)
 
@@ -89,6 +89,35 @@ This value will be ignored if set `owdriver-keep-driving-command-regexp' non-nil
 (defvar owdriver--window nil "Current window drived by the command of `owdriver-mode-map'.")
 (defvar owdriver--start-location nil)
 (defvar owdriver--keep-driving-function nil)
+
+
+;;;;;;;;;;
+;; Mode
+
+;;;###autoload
+(defvar owdriver-mode-map (make-sparse-keymap))
+
+;;;###autoload
+(define-minor-mode owdriver-mode
+  "Quickly perform various actions on other windows."
+  :init-value nil
+  :lighter " OW"
+  :keymap owdriver-mode-map
+  :global t
+  :group 'owdriver
+  (if owdriver-mode
+      (progn
+        (setq owdriver--start-location `(:window ,(selected-window) :point ,(window-point), :config ,(current-window-configuration)))
+        (setq owdriver--keep-driving-function owdriver-keep-driving-function)
+        (add-hook 'pre-command-hook 'owdriver--cleanup))
+    (when owdriver--start-location
+      (when (not (window-live-p (plist-get owdriver--start-location :window)))
+        (set-window-configuration (plist-get owdriver--start-location :config)))
+      (select-window (plist-get owdriver--start-location :window))
+      (set-window-point (plist-get owdriver--start-location :window) (plist-get owdriver--start-location :point))
+      (setq owdriver--start-location nil))
+    (setq owdriver--keep-driving-function nil)
+    (remove-hook 'pre-command-hook 'owdriver--cleanup)))
 
 
 ;;;;;;;;;;;;;
@@ -162,8 +191,9 @@ This value will be ignored if set `owdriver-keep-driving-command-regexp' non-nil
              (featurep 'pophint)
              (boundp 'pophint--next-window-source)
              (>= (cl-loop for w in (window-list) count (funcall is-nextable-window w)) 2)
-             (when-let ((hint (pophint:do :source pophint--next-window-source :allwindow t)))
-               (pophint:hint-window hint)))
+             (with-no-warnings
+               (when-let ((hint (pophint:do :source pophint--next-window-source :allwindow t)))
+                 (pophint:hint-window hint))))
         (progn
           (select-window currwnd)
           (other-window (if reverse -1 1))
@@ -175,35 +205,6 @@ This value will be ignored if set `owdriver-keep-driving-command-regexp' non-nil
           (rx-to-string `(and bos (regexp ,(regexp-opt owdriver-keep-driving-command-prefixes))))))
   (or (memq command owdriver-keep-driving-commands)
       (string-match owdriver-keep-driving-command-regexp (symbol-name command))))
-
-
-;;;;;;;;;;
-;; Mode
-
-;;;###autoload
-(defvar owdriver-mode-map (make-sparse-keymap))
-
-;;;###autoload
-(define-minor-mode owdriver-mode
-  "Quickly perform various actions on other windows."
-  :init-value nil
-  :lighter " OW"
-  :keymap owdriver-mode-map
-  :global t
-  :group 'owdriver
-  (if owdriver-mode
-      (progn
-        (setq owdriver--start-location `(:window ,(selected-window) :point ,(window-point), :config ,(current-window-configuration)))
-        (setq owdriver--keep-driving-function owdriver-keep-driving-function)
-        (add-hook 'pre-command-hook 'owdriver--cleanup))
-    (when owdriver--start-location
-      (when (not (window-live-p (plist-get owdriver--start-location :window)))
-        (set-window-configuration (plist-get owdriver--start-location :config)))
-      (select-window (plist-get owdriver--start-location :window))
-      (set-window-point (plist-get owdriver--start-location :window) (plist-get owdriver--start-location :point))
-      (setq owdriver--start-location nil))
-    (setq owdriver--keep-driving-function nil)
-    (remove-hook 'pre-command-hook 'owdriver--cleanup)))
 
 
 ;;;;;;;;;;;;;;;;;;
@@ -228,7 +229,7 @@ This value will be ignored if set `owdriver-keep-driving-command-regexp' non-nil
     (yaxception:try
       (setq owdriver--window (funcall owdriver-next-window-function reverse))
       (select-window owdriver--window)
-      (lexical-let ((ov (make-overlay (point-min) (point-max))))
+      (let ((ov (make-overlay (point-min) (point-max))))
         (overlay-put ov 'face 'highlight)
         (run-with-idle-timer 0.1 nil (lambda () (when ov (delete-overlay ov))))
         (owdriver--show-message "Drived window is '%s'" owdriver--window)))
@@ -276,7 +277,7 @@ This value will be ignored if set `owdriver-keep-driving-command-regexp' non-nil
   "Define the command for driving `owdriver--window' from COMMAND.
 
 The command named `owdriver-do-COMMAND' is defined by this function.
-BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is no need."
+BODY is sexp. If nil, COMMAND will be called."
   (declare (indent 2))
   (let* ((body (or body `((call-interactively ',command))))
          (cmdnm (symbol-name command))
@@ -293,7 +294,7 @@ BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is n
              ,@body)))
        ;;;###autoload
        (defun ,fcommand ()
-         ,(format "Do `%s' in `owdriver--window' with `owdriver-next-window'." cmdnm)
+         ,(format "Do `%s' in `owdriver--window'\nwith `owdriver-next-window'." cmdnm)
          (interactive)
          (owdriver--with-selected-window ,fcommand t
            ,@body)))))
@@ -319,8 +320,11 @@ BODY is sexp. If COMMAND is used in `owdriver--window' actually, this value is n
   ;; Patch for Emacs 26.1
   (when (>= emacs-major-version 26)
     (defun owdriver--patch-on-26-1 ()
-      "Function to patch the trouble on GNU Emacs 26.1 (build 1, x86_64-apple-darwin14.5.0, NS appkit-1348.17 Version 10.10.5 (Build 14F2511)) of 2018-05-31,
-which emacs seems to not refresh a screen when `scroll-left', `scroll-right' with `with-selected-window'."
+      "Function to patch the trouble on GNU Emacs 26.1
+(build 1, x86_64-apple-darwin14.5.0, NS appkit-1348.17 Version 10.10.5
+(Build 14F2511)) of 2018-05-31,
+which emacs seems to not refresh a screen
+when `scroll-left', `scroll-right' with `with-selected-window'."
       (let ((wnd (get-buffer-window))
             (pt (with-selected-window owdriver--window (point))))
         (select-window owdriver--window)
