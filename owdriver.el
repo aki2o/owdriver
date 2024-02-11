@@ -5,7 +5,7 @@
 ;; Author: Hiroaki Otsu <ootsuhiroaki@gmail.com>
 ;; Keywords: convenience
 ;; URL: https://github.com/aki2o/owdriver
-;; Version: 0.3.1
+;; Version: 0.4.0
 ;; Package-Requires: ((log4e "0.4.1") (yaxception "1.0.0"))
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -55,12 +55,12 @@
   :type 'function
   :group 'owdriver)
 
-(defcustom owdriver-keep-driving-commands '(owdriver-start owdriver-next-window owdriver-previous-window)
+(defcustom owdriver-keep-driving-commands '(owdriver-start owdriver-next-window owdriver-previous-window owdriver-release owdriver-quit)
   "List of command kept handling by `owdriver-keep-driving-p'."
   :type (list 'function)
   :group 'owdriver)
 
-(defcustom owdriver-keep-driving-command-prefixes '("scroll-" "next-" "previous-" "forward-" "backward-" "beginning-of-" "end-of-" "move-" "switch-to-" "xref-" "find-" "isearch-" "project-" "projectile-")
+(defcustom owdriver-keep-driving-command-prefixes '("scroll-" "next-" "previous-" "forward-" "backward-" "beginning-of-" "end-of-" "move-" "switch-to-" "xref-" "find-" "isearch-" "project-")
   "List of command prefix kept handling by `owdriver-keep-driving-p'.
 This will be ignored if set `owdriver-keep-driving-command-regexp' non-nil."
   :type (list 'string)
@@ -107,12 +107,18 @@ This will be ignored if set `owdriver-keep-driving-command-regexp' non-nil."
   :group 'owdriver
   (if owdriver-mode
       (progn
+        (owdriver--info* "enable owdriver")
         (setq owdriver--start-location `(:window ,(selected-window) :point ,(window-point), :config ,(current-window-configuration)))
         (setq owdriver--keep-driving-function owdriver-keep-driving-function)
+        (owdriver--trace* "store window configuration ... %s" (plist-get owdriver--start-location :config))
+        (owdriver--trace* "store window point ... %s %s" (plist-get owdriver--start-location :window) (plist-get owdriver--start-location :point))
         (add-hook 'pre-command-hook 'owdriver--cleanup))
+    (owdriver--info* "disable owdriver")
     (when owdriver--start-location
       (when (not (window-live-p (plist-get owdriver--start-location :window)))
+        (owdriver--trace* "get back window configuration")
         (set-window-configuration (plist-get owdriver--start-location :config)))
+      (owdriver--trace* "get back window point")
       (select-window (plist-get owdriver--start-location :window))
       (set-window-point (plist-get owdriver--start-location :window) (plist-get owdriver--start-location :point))
       (setq owdriver--start-location nil))
@@ -135,7 +141,7 @@ This will be ignored if set `owdriver-keep-driving-command-regexp' non-nil."
   (declare (indent 2))
   `(yaxception:$
      (yaxception:try
-       (owdriver--trace "start with select window : wnd[%s] force-next-window[%s]"
+       (owdriver--info* "start with select window : wnd[%s] force-next-window[%s]"
                         owdriver--window ,force-next-window)
        (let ((owdriver-keep-driving-function nil))
          (owdriver-start ,force-next-window)
@@ -148,32 +154,32 @@ This will be ignored if set `owdriver-keep-driving-command-regexp' non-nil."
                        (yaxception:get-stack-trace-string e)))))
 
 (defun owdriver--get-binding-keys (cmd)
-  (owdriver--trace "start get binding keys : %s" cmd)
+  (owdriver--trace* "start get binding keys : %s" cmd)
   (cl-loop for b in (where-is-internal cmd global-map)
            for bindkey = (or (ignore-errors (key-description b))
                              "")
            if (and (not (string= bindkey ""))
                    (not (string-match "\\`<menu-bar>" bindkey))
                    (not (string-match "\\`<[^>]*mouse[^>]*>" bindkey)))
-           collect (progn (owdriver--trace "found binding : %s" bindkey)
+           collect (progn (owdriver--trace* "found binding : %s" bindkey)
                           bindkey)))
 
 (defun owdriver--get-keybind (cmd)
-  (owdriver--trace "start get keybind : %s" cmd)
+  (owdriver--trace* "start get keybind : %s" cmd)
   (cl-loop with ret = nil
            for k in (owdriver--get-binding-keys cmd)
            if (or (not ret)
                   (< (length k) (length ret)))
            do (setq ret k)
-           finally return (progn (owdriver--trace "got keybind : %s" ret)
+           finally return (progn (owdriver--trace* "got keybind : %s" ret)
                                  ret)))
 
 (defun owdriver--cleanup ()
   (when (and owdriver-mode
              (or (not (functionp owdriver--keep-driving-function))
                  (not (funcall owdriver--keep-driving-function this-command))))
-    (owdriver--trace "start cleanup. this-command[%s]" this-command)
-    (owdriver-mode 0)))
+    (owdriver--info* "start cleanup. this-command[%s]" this-command)
+    (owdriver-mode -1)))
 
 
 ;;;;;;;;;;;;;;
@@ -246,19 +252,22 @@ This will be ignored if set `owdriver-keep-driving-command-regexp' non-nil."
   (owdriver-next-window t))
 
 ;;;###autoload
-(defun owdriver-focus-window ()
-  "Quit driving `owdriver--window' and move to `owdriver--window'."
+(defun owdriver-release ()
+  "Quit driving `owdriver--window' without getting back."
   (interactive)
-  (when (window-live-p owdriver--window)
-    (select-window owdriver--window)
-    (keyboard-quit)))
+  (setq owdriver--start-location nil)
+  (setq owdriver--keep-driving-function nil)
+  (owdriver--cleanup))
+
+(defalias 'owdriver-focus-window 'owdriver-release)
+(make-obsolete 'owdriver-focus-window 'owdriver-release "0.4.0")
 
 ;;;###autoload
 (defun owdriver-quit ()
-  "Quit driving `owdriver--window'."
+  "Quit driving `owdriver--window' to get back the situation before start."
   (interactive)
-  (keyboard-quit))
-
+  (setq owdriver--keep-driving-function nil)
+  (owdriver--cleanup))
 
 ;;;;;;;;;;;;;;;
 ;; For Setup
@@ -266,7 +275,7 @@ This will be ignored if set `owdriver-keep-driving-command-regexp' non-nil."
 ;;;###autoload
 (defun owdriver-add-keymap (keystroke command)
   "Add the keymap of `owdriver-mode-map'."
-  (owdriver--trace "start add keymap. keystroke[%s] command[%s]" keystroke command)
+  (owdriver--trace* "start add keymap. keystroke[%s] command[%s]" keystroke command)
   (when (and (stringp keystroke)
              (not (string= keystroke ""))
              (commandp command))
@@ -284,7 +293,7 @@ BODY is sexp. If nil, COMMAND will be called."
          (ncommand (intern (concat "owdriver-do-" cmdnm)))
          (fcommand (intern (concat "owdriver-do-" cmdnm "-on-next-window"))))
     `(progn
-       (owdriver--trace "start define command[%s]" ,cmdnm)
+       (owdriver--info* "start define command[%s]" ,cmdnm)
        ;;;###autoload
        (defun ,ncommand (&optional arg)
          ,(format "Do `%s' in `owdriver--window'.\n\nIf prefix argument is given, do `owdriver-next-window' before that." cmdnm)
@@ -305,7 +314,7 @@ BODY is sexp. If nil, COMMAND will be called."
   ;; Own command
   (owdriver-add-keymap "C-o"     'owdriver-next-window)
   (owdriver-add-keymap "C-S-o"   'owdriver-previous-window)
-  (owdriver-add-keymap "C-c C-k" 'owdriver-focus-window)
+  (owdriver-add-keymap "C-c C-k" 'owdriver-release)
   (owdriver-add-keymap "C-c C-c" 'owdriver-quit)
   ;; Basic command
   (owdriver-define-command scroll-up)
@@ -337,6 +346,12 @@ when `scroll-left', `scroll-right' with `with-selected-window'."
 
     (defadvice owdriver-do-scroll-left (after owdriver-patch activate) (owdriver--patch-on-26-1))
     (defadvice owdriver-do-scroll-right (after owdriver-patch activate) (owdriver--patch-on-26-1))))
+
+
+(add-hook 'minibuffer-setup-hook 'owdriver-release)
+
+(with-eval-after-load 'projectile
+  (add-to-list 'owdriver-keep-driving-command-prefixes "projectile-" t))
 
 
 (provide 'owdriver)
